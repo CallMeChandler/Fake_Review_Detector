@@ -45,10 +45,10 @@ Batch mode: Upload CSV → get predictions + margins back
 └─ README.md
 
 
-![Home](assets/screenshots/1_home.png)
-![Single Prediction](assets/screenshots/2_single.png)
-![Batch Upload](assets/screenshots/3_batch.png)
-![Batch Results](assets/screenshots/4_results.png)
+![Model Accuracy](assets/screenshots/SS1.jpg)
+![Fake Review prediction](assets/screenshots/SS2.jpg)
+![Original Review prediction](assets/screenshots/SS3.jpg)
+![Batch Upload](assets/screenshots/SS4.jpg)
 
 ## 🚀 Quickstart
 
