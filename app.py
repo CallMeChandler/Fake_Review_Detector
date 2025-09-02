@@ -1,31 +1,60 @@
 import streamlit as st
+import json
 import joblib
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from sklearn.pipeline import Pipeline as SKPipeline
 
 st.set_page_config(page_title="Fake Review Detector", page_icon="🕵️‍♂️", layout="centered")
 
-BASE_DIR   = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models"
-PIPE_PATH  = MODELS_DIR / "text_svm_pipeline.joblib"
+PIPE_PATH = MODELS_DIR / "text_svm_pipeline_new.joblib"
+FEATS_PATH = MODELS_DIR / "feats_transformer.joblib"
+CLF_PATH = MODELS_DIR / "linear_svc_model.joblib"
+THR_PATH = MODELS_DIR / "threshold.json"
 
 @st.cache_resource
-def load_pipe(path_str, cache_bust):
-    pipe = joblib.load(path_str)
-    tfidf = pipe.named_steps.get("tfidf", None)
-    if tfidf is None or not hasattr(tfidf, "idf_"):
-        raise RuntimeError("Loaded pipeline's TF-IDF is not fitted. Re-save the pipeline AFTER fitting (pipe.fit(...)).")
-    return pipe
+def load_pipe():
+    if PIPE_PATH.exists():
+        obj = joblib.load(PIPE_PATH)
+        if not hasattr(obj, "named_steps") or "clf" not in obj.named_steps:
+            raise RuntimeError("Loaded object is not a sklearn Pipeline with a 'clf' step.")
+        try:
+            _ = obj.decision_function(["hello world"])
+        except Exception as e:
+            raise RuntimeError(f"Pipeline can't transform texts: {e}")
+        return obj
+    if FEATS_PATH.exists() and CLF_PATH.exists():
+        feats = joblib.load(FEATS_PATH)
+        clf = joblib.load(CLF_PATH)
+        pipe = SKPipeline([("feats", feats), ("clf", clf)])
+        try:
+            _ = pipe.decision_function(["hello world"])
+        except Exception as e:
+            raise RuntimeError(f"Reconstructed pipeline can't transform texts: {e}")
+        return pipe
+    if CLF_PATH.exists():
+        raise RuntimeError("Found only classifier. Provide a fitted text transformer or save a full pipeline.")
+    raise RuntimeError("No usable model files found in models/.")
 
 def predict_margin(texts, pipe):
     m = pipe.decision_function(texts)
     if isinstance(m, list):
         m = np.asarray(m)
     classes = pipe.named_steps["clf"].classes_
+    base_preds = pipe.predict(texts)
     if m.ndim == 1:
         margins = m
-        pos_label, neg_label = classes[1], classes[0]
+        pred_if_pos_cls1 = np.where(margins >= 0, classes[1], classes[0])
+        pred_if_pos_cls0 = np.where(margins >= 0, classes[0], classes[1])
+        agree1 = np.sum(pred_if_pos_cls1 == base_preds)
+        agree0 = np.sum(pred_if_pos_cls0 == base_preds)
+        if agree1 >= agree0:
+            pos_label, neg_label = classes[1], classes[0]
+        else:
+            pos_label, neg_label = classes[0], classes[1]
         return margins, pos_label, neg_label, classes
     else:
         margins = m.max(axis=1)
@@ -44,42 +73,40 @@ def pretty_label(lbl, pos_label, neg_label):
         return "Original review"
     return str(lbl)
 
-# ---------- UI ----------
 st.title("🛒 Fake Product Review Detector")
 st.write("Paste a review and I’ll predict whether it’s a **Fake review** or an **Original review** using TF-IDF + Linear SVM.")
 
-if not PIPE_PATH.exists():
-    st.error(f"Model file not found: {PIPE_PATH}")
-    st.stop()
-
 try:
-    cache_bust = PIPE_PATH.stat().st_mtime
-    pipe = load_pipe(str(PIPE_PATH), cache_bust)
+    pipe = load_pipe()
 except Exception as e:
-    st.error(f"Could not load pipeline from {PIPE_PATH}.\n\n{e}")
+    st.error(f"Could not load a usable model from {MODELS_DIR}.\n\n{e}")
     st.stop()
 
 classes = pipe.named_steps["clf"].classes_
 if len(classes) != 2:
     st.warning(f"Expected binary classes, found: {classes}")
 
-# Sidebar
+default_th = 0.0
+if THR_PATH.exists():
+    try:
+        default_th = float(json.load(open(THR_PATH))["threshold"])
+    except Exception:
+        pass
+
 st.sidebar.header("Inference Settings")
 th = st.sidebar.slider(
-    "Decision threshold (margin)", -2.0, 2.0, 0.0, 0.01,
-    help="> 0 favors calling a review **Fake**. Move right to be stricter about flagging a review as Fake."
+    "Decision threshold (margin)", -2.0, 2.0, 0.8, 0.01,
+    help="> 0 favors calling a review Fake.", key="th_slider"
 )
 show_margin = st.sidebar.checkbox("Show raw margin", value=True)
 st.sidebar.markdown("---")
-st.sidebar.write("**Batch mode** available below the text box.")
+st.sidebar.write("Batch mode available below the text box.")
 
-# ---------- NEW: persist outputs in session_state ----------
 if "single_pred_text" not in st.session_state:
     st.session_state.single_pred_text = None
 if "single_margin" not in st.session_state:
     st.session_state.single_margin = None
 
-# ---------- SINGLE PREDICTION (form to avoid flicker/blank) ----------
 with st.form("single_review_form", clear_on_submit=False):
     txt = st.text_area("Enter a review", height=140, placeholder="Type/paste a product review here…", key="single_text")
     submitted = st.form_submit_button("Predict")
@@ -93,7 +120,6 @@ with st.form("single_review_form", clear_on_submit=False):
             st.session_state.single_pred_text = pretty_label(pred, pos_label, neg_label)
             st.session_state.single_margin = margin
 
-# Show last prediction persistently (even after rerun)
 if st.session_state.single_pred_text is not None:
     st.subheader(f"Prediction: **{st.session_state.single_pred_text}**")
     if show_margin and st.session_state.single_margin is not None:
@@ -102,7 +128,6 @@ if st.session_state.single_pred_text is not None:
 st.markdown("---")
 st.subheader("📦 Batch predictions (CSV)")
 
-# ---------- BATCH (form to prevent accidental reruns) ----------
 with st.form("batch_form", clear_on_submit=False):
     uploaded = st.file_uploader("Upload CSV", type=["csv"], help="CSV with a text column (e.g., clean_text or text_).", key="batch_uploader")
     run_batch = st.form_submit_button("Run batch")
@@ -117,17 +142,14 @@ with st.form("batch_form", clear_on_submit=False):
                     st.error("No text-like columns found.")
                 else:
                     col = st.selectbox("Select text column", text_cols, key="batch_text_col")
-                    # Important: selectbox creates a rerun; guard with form so we only compute on submit
                     texts = df[col].astype(str).tolist()
                     margins, pos_label, neg_label, classes = predict_margin(texts, pipe)
                     preds = [pos_label if m >= th else neg_label for m in margins]
                     preds_text = [pretty_label(p, pos_label, neg_label) for p in preds]
-
                     out = df.copy()
                     out["prediction"] = preds
                     out["prediction_text"] = preds_text
                     out["margin"] = margins
-
                     st.success("Done. Sample:")
                     st.dataframe(out.head(10))
                     csv = out.to_csv(index=False).encode("utf-8")
