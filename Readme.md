@@ -22,18 +22,26 @@ Batch mode: Upload CSV → get predictions + margins back
 ## 📂 Repo structure
 .
 ├─ app.py                        # Streamlit app (single & batch inference UI)
+
 ├─ models/
+
 │  └─ text_svm_pipeline_new.joblib   # Saved sklearn pipeline (vectorizers + LinearSVC)
+
 ├─ data/                         # (optional) keep your CSV/datasets here
+
 │  └─ Reviews_Dataset.csv
+
 ├─ assets/
+
 │  └─ screenshots/               # put your UI screenshots here
 │     ├─ 1_home.png
 │     ├─ 2_single.png
 │     ├─ 3_batch_upload.png
 │     ├─ 4_batch_results.png
 │     └─ 5_threshold_tuning.png
+
 ├─ Fake_Review_Detection.ipynb   # training notebook
+
 └─ README.md
 
 
