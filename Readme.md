@@ -1,9 +1,9 @@
-Fake Review Detector 🕵️‍♂️🛒
+# Fake Review Detector 🕵️‍♂️🛒
 
 Detect Fake vs Original product reviews with a lightweight NLP pipeline (no deep learning).
 Built with scikit-learn and Streamlit; ships a single saved pipeline you can load and run instantly.
 
-✨ Highlights
+## ✨ Highlights
 
 Model: Linear SVM on a multi-view text representation
 
@@ -19,7 +19,7 @@ Practical decision control: Margin threshold slider to tune precision/recall tra
 
 Batch mode: Upload CSV → get predictions + margins back
 
-📂 Repo structure
+## 📂 Repo structure
 .
 ├─ app.py                      # Streamlit app (single & batch inference UI)
 ├─ models/
@@ -36,7 +36,7 @@ Batch mode: Upload CSV → get predictions + margins back
 ![Batch Upload](assets/screenshots/3_batch.png)
 ![Batch Results](assets/screenshots/4_results.png)
 
-🚀 Quickstart
+## 🚀 Quickstart
 
 Create a venv (recommended):
 
@@ -65,7 +65,7 @@ streamlit run app.py
 
 Open the local URL → paste a review → Predict.
 
-🧠 How it works (Model)
+## 🧠 How it works (Model)
 
 Task: Binary classification
 Labels: OR = Fake review, CG = Original review (mapped to user-friendly labels in the UI)
@@ -88,7 +88,7 @@ Default cutoff can be tuned on a validation split and stored in models/threshold
 Training/Eval: See notebooks/Fake_Review_Detection.ipynb for the full pipeline, splitting, and metrics.
 (Accuracy/precision/recall are reported on a held-out test split.)
 
-🖥️ How it works (App)
+## 🖥️ How it works (App)
 
 Loads a fitted pipeline (models/text_svm_pipeline_new.joblib) and optionally a tuned threshold (models/threshold.json).
 
@@ -97,7 +97,7 @@ Single-review form: transforms text → gets margin → compares to slider thres
 Batch mode: upload CSV, pick a text column, and download predictions with margins.
 This behavior (loading, decision via decision_function, UI, and batch flow) is implemented in app.py. 
 
-⚙️ Configuration & Tips
+## ⚙️ Configuration & Tips
 
 Threshold: Use the sidebar to raise/lower the margin cutoff.
 
@@ -112,7 +112,7 @@ Small texts: One-word reviews (“good”) are low-information; if needed, raise
 
 Dataset: Trained on an e-commerce reviews dataset (e.g., Amazon/Kaggle). Swap in any CSV; retrain the notebook to update the pipeline.
 
-📊 Reproducible Training (Notebook)
+## 📊 Reproducible Training (Notebook)
 
 Split: Stratified train/test to preserve class ratios
 
@@ -124,7 +124,7 @@ Tuning: Pick a margin threshold on a validation fold to hit your target (e.g., F
 
 Export: Save the fitted pipeline as models/text_svm_pipeline_new.joblib and (optionally) models/threshold.json
 
-🧪 Limitations
+## 🧪 Limitations
 
 Margin is not a probability; for calibrated probabilities use CalibratedClassifierCV or Logistic Regression.
 
@@ -132,11 +132,11 @@ Extremely short inputs can be ambiguous by nature; thresholding helps.
 
 If you change tokenization/feature settings, retrain and re-export the pipeline.
 
-📄 License
+## 📄 License
 
 MIT (or your choice). Add a short data usage note if your dataset has its own license.
 
-🙏 Acknowledgments
+## 🙏 Acknowledgments
 
 scikit-learn maintainers
 
